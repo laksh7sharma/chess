@@ -799,6 +799,6 @@ class Board:
         return (isQueen[0] or totalPieceValue[0] < 15) and (isQueen[1] or totalPieceValue[1] < 15)
     # end of core functions
 
-b = Board("rnb1kbnr/ppp4p/2pp1qp1/7K/2B5/8/PPPP1PPP/RNBQ2NR") # rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
+b = Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR") # rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
 
 b.play(4, 25)
