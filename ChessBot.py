@@ -11,13 +11,17 @@ class Board:
         self.Vectors = [(-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1)]
         self.PiecesVectors = {1: [], 2: [], 3: [1, 3, 5, 7], 4: [0, 2, 4, 6], 5: [i for i in range(8)],
                               6: [i for i in range(8)]}
-        self.KingLocations = [(0, 4), (4, 5)]
         self.LinesOfAttack = [[], []]
         self.counter = 0
 
-        pawn = [[0, 0, 0, 0, 0, 0, 0, 0], [50, 50, 50, 50, 50, 50, 50, 50], [10, 10, 20, 30, 30, 20, 10, 10],
-                [5, 5, 10, 25, 25, 10, 5, 5], [0, 0, 0, 20, 20, 0, 0, 0], [5, -5, -10, 0, 0, -10, -5, 5],
-                [5, 10, 10, -20, -20, 10, 10, 5], [0, 0, 0, 0, 0, 0, 0, 0]]
+        pawn = [[0, 0, 0, 0, 0, 0, 0, 0],
+                [50, 50, 50, 50, 50, 50, 50, 50],
+                [10, 10, 20, 30, 30, 20, 10, 10],
+                [5, 5, 10, 25, 25, 10, 5, 5],
+                [0, 0, 0, 20, 20, 0, 0, 0],
+                [5, -5, -10, 0, 0, -10, -5, 5],
+                [5, 10, 10, -20, -20, 10, 10, 5],
+                [0, 0, 0, 0, 0, 0, 0, 0]]
         knight = [[-50, -40, -30, -30, -30, -30, -40, -50], [-40, -20, 0, 0, 0, 0, -20, -40],
                   [-30, 0, 10, 15, 15, 10, 0, -30], [-30, 5, 15, 20, 20, 15, 5, -30], [-30, 0, 15, 20, 20, 15, 0, -30],
                   [-30, 5, 10, 15, 15, 10, 5, -30], [-40, -20, 0, 5, 5, 0, -20, -40],
@@ -160,6 +164,7 @@ class Board:
             pieceLocations, GridCopy = self.move(newp1, newp2, pieceLocations, GridCopy)
 
         return pieceLocations, GridCopy
+
     # end of the foundation functions
 
     # start of UI functions
@@ -227,7 +232,9 @@ class Board:
                 for n2 in [-2, 2]:
                     positions = [self.vec_add(coordinates, (n1, n2)), self.vec_add(coordinates, (n2, n1))]
                     for new in positions:
-                        if 0 <= new[0] <= 7 and 0 <= new[1] <= 7 and ((board[new[0]][new[1]] & 8) != colour or board[new[0]][new[1]] == 0): possible.append(new)
+                        if 0 <= new[0] <= 7 and 0 <= new[1] <= 7 and (
+                                (board[new[0]][new[1]] & 8) != colour or board[new[0]][new[1]] == 0): possible.append(
+                            new)
         else:
             allDirections = [self.Vectors[el] for el in self.PiecesVectors[pieceNumber]]
             for dir in allDirections:
@@ -249,7 +256,7 @@ class Board:
     def castle(self, col, direction, board, pieceLocations):
         colour = col // 8
         kingPos = (colour * 7, 4)
-        CastleThroughCheck = True
+        CastleThroughCheck = False
 
         if direction == "K":  # ie kingside
             rookPos = (kingPos[0], 7)
@@ -259,17 +266,23 @@ class Board:
             positions = [(colour * 7, 4), (colour * 7, 3), (colour * 7, 2)]
 
         for pos in positions:
-            res = self.isUnderSevereAttack(pos, board, pieceLocations)
-            if res or board[pos[0]][pos[1]]:
+            res = self.isKingInCheck(pos, board, pieceLocations)
+            if not res and (board[pos[0]][pos[1]] and pos != kingPos): # checks if square is empty or not as long as square isn't king's original position
+                self.output(board)
                 CastleThroughCheck = True
                 break
 
-        return (board[rookPos[0]][rookPos[1]] == col + 4 and board[kingPos[0]][kingPos[1]] == col + 6) and not CastleThroughCheck
+        return (board[rookPos[0]][rookPos[1]] == col + 4 and board[kingPos[0]][
+            kingPos[1]] == col + 6) and not CastleThroughCheck
 
     def legalMoves(self, coordinates, kingInfo, isPinned, allowed, board):
         possible = self.returnPossibleMoves(coordinates, board)
-        isCheck, AttackSquare = kingInfo
+        isCheck, isDoubleCheck, AttackSquare = kingInfo
         if AttackSquare:
+            if isDoubleCheck:
+                if board[coordinates[0]][coordinates[1]] & 7 != 6:
+                    return []
+
             if isPinned:
                 possible = [pos for pos in possible if pos == AttackSquare]
             else:
@@ -279,12 +292,11 @@ class Board:
 
     def isKingInCheck(self, coordinates, grid, pieceLocations):
         colour = (grid[coordinates[0]][coordinates[1]] & 8) // 8
-        thisPieceNumber = 6
         opponentsPieces = pieceLocations[1 - colour]
         myPieces = pieceLocations[colour]
         allPieces = opponentsPieces[:]
         allPieces.extend(pieceLocations[colour])
-        attack = [float("inf")]
+        attack = []
         attackSquare = ()
         pinnedPiece = ()
 
@@ -299,13 +311,13 @@ class Board:
                     colour == 0 and (direction == (-1, 1) or direction == (-1, -1)))):
                 attack.append(1)  # since this colour is for the opponent's pawns
                 attackSquare = piece
-                break
+
             elif pieceNumber == 2 and (
                     (abs(direction[0]), abs(direction[1])) == (1, 2) or (abs(direction[0]), abs(direction[1])) == (
-            2, 1)):
+                    2, 1)):
                 attack.append(2)
                 attackSquare = piece
-                break
+
             elif (pieceNumber == 3 or pieceNumber == 5) and abs(direction[0]) == abs(direction[1]):
                 scale = abs(direction[0])
                 vec = (direction[0] // scale, direction[1] // scale)
@@ -321,7 +333,7 @@ class Board:
                 if valid and len(obstacles) == 1 and coordinates in obstacles:
                     attack.append(pieceNumber)
                     attackSquare = piece
-                    break
+
                 if len(obstacles) == 2:
                     pinnedPiece = obstacles[0]
                     attackSquare = piece
@@ -350,12 +362,12 @@ class Board:
                 if valid and len(obstacles) == 1 and coordinates in obstacles:
                     attack.append(pieceNumber)
                     attackSquare = piece
-                    break
+
                 if len(obstacles) == 2:
                     pinnedPiece = obstacles[0]
                     attackSquare = piece
 
-        return thisPieceNumber > min(attack), attackSquare, pinnedPiece
+        return len(attack) >= 1, len(attack) >= 2, attackSquare, pinnedPiece
 
     def legalKingMoves(self, kingLoc, board, pieceLocations):
 
@@ -382,7 +394,7 @@ class Board:
             pieceLocationsCopy = [row[:] for row in pieceLocations]
             pieceLocationsCopy, copy = self.move(kingLoc, endCoords, pieceLocationsCopy, copy)
 
-            res, squ, piece = self.isKingInCheck(endCoords, copy, pieceLocationsCopy)
+            res, res1, squ, piece = self.isKingInCheck(endCoords, copy, pieceLocationsCopy)
 
             if not res:
                 valid.append(endCoords)
@@ -390,11 +402,12 @@ class Board:
             if endCoords == kingLoc:
                 pinnedPiece = piece
                 isCheck = res
+                isDoubleCheck = res1
                 attackSquare = squ
 
         if kingLoc in valid: valid.remove(kingLoc)
 
-        return (isCheck, attackSquare, pinnedPiece), valid
+        return (isCheck, isDoubleCheck, attackSquare, pinnedPiece), valid
 
     def isCheckMate(self, board, pieceLocations, colour):
         pinned = []
@@ -403,7 +416,7 @@ class Board:
             if board[coords[0]][coords[1]] & 7 == 6:
                 kingLoc = coords
                 info, possible = self.legalKingMoves(coords, board, pieceLocations)
-                isCheck, attackSquare, pinnedPiece = info
+                isCheck, isDoubleCheck, attackSquare, pinnedPiece = info
                 pinned.append(pinnedPiece)
                 # pass to legal moves, isCheck and square which check coming from
                 break
@@ -424,7 +437,7 @@ class Board:
                 for i in range(scale):
                     allowed.append(self.vec_add(attackSquare, vec2, i))
             for vector in allowed:
-                canSquareBeAttacked = self.isUnderSevereAttack(vector, board, pieceLocations)
+                canSquareBeAttacked = self.isUnderSevereAttack(vector, board, pieceLocations)  # ie the piece of the same colour as king can move to that square
                 if canSquareBeAttacked: return False
 
         return isCheck and len(possible) == 0
@@ -438,32 +451,35 @@ class Board:
             if board[coords[0]][coords[1]] & 7 == 6:
                 kingLoc = coords
                 info, possible = self.legalKingMoves(coords, board, pieceLocations)
-                isCheck, attackSquare, pinnedPiece = info
+                isCheck, isDoubleCheck, attackSquare, pinnedPiece = info
                 pinned.append(pinnedPiece)
-                kingInfo = (isCheck, attackSquare)
+                kingInfo = (isCheck, isDoubleCheck, attackSquare)
                 moves[coords] = possible
                 # pass to legal moves, isCheck and square which check coming from
                 break
 
-        if isCheck:
-            vec1 = self.vec_sub(attackSquare, kingLoc)
-            piece = board[attackSquare[0]][attackSquare[1]] & 7
-            if piece <= 2:
-                allowed.append(attackSquare)
-            else:
-                for i in self.PiecesVectors[piece]:
-                    vec = self.Vectors[i]
-                    if self.vec_div(vec1, vec) > 0:
-                        scale = self.vec_div(vec1, vec)
-                        vec2 = vec
-                        break
-                for i in range(scale + 1):
-                    allowed.append(self.vec_add(attackSquare, vec2, i))
+        try:
+            if isCheck:
+                vec1 = self.vec_sub(attackSquare, kingLoc)
+                piece = board[attackSquare[0]][attackSquare[1]] & 7
+                if piece <= 2:
+                    allowed.append(attackSquare)
+                else:
+                    for i in self.PiecesVectors[piece]:
+                        vec = self.Vectors[i]
+                        if self.vec_div(vec1, vec) > 0:
+                            scale = self.vec_div(vec1, vec)
+                            vec2 = vec
+                            break
+                    for i in range(scale + 1):
+                        allowed.append(self.vec_add(attackSquare, vec2, i))
 
-        for coords in pieceLocations[colour]:
-            if board[coords[0]][coords[1]] & 7 != 6:
-                possible = self.legalMoves(coords, kingInfo, coords in pinned, allowed, board)
-                moves[coords] = possible
+            for coords in pieceLocations[colour]:
+                if board[coords[0]][coords[1]] & 7 != 6:
+                    possible = self.legalMoves(coords, kingInfo, coords in pinned, allowed, board)
+                    moves[coords] = possible
+        except:
+            pass
         return moves
 
     # end of Legal Move functions
@@ -498,12 +514,12 @@ class Board:
 
             for k in range(2):
                 if countP[k] == 2 or countP[k] == 3:
-                    weight[k] += DoubledPawns * (countP[k] - 1)
+                    weight[k] -= DoubledPawns * (countP[k] - 1)
 
                 if rookPresent[k]:
                     if sum(countP) == 1:
                         weight[k] += HalfOpenFile
-                    elif sum(countP) == 2:
+                    elif sum(countP) == 0:
                         weight[k] += OpenFile
 
         eval -= weight[0] / 100
@@ -566,10 +582,22 @@ class Board:
                         valid = False
                 if valid: attack.append(pieceNumber)
 
-        return thisPieceNumber > min(attack) or (len(attack) >= 2 and thisPieceNumber != 1)
+        return thisPieceNumber > min(attack) or len(attack) >= 2
+
     # end of evaluation functions
 
     # start of core functions
+    def isMiddleGame(self, board, pieceLocations):
+        totalPieceValue = [0, 0]
+        isQueen = [False, False]
+
+        for c in range(2):
+            for piece in pieceLocations[c]:
+                totalPieceValue[c] += self.PieceValue[(board[piece[0]][piece[1]] & 7) - 1]
+                isQueen[c] |= board[piece[0]][piece[1]] & 7 == 5
+
+        return (isQueen[0] or totalPieceValue[0] < 15) and (isQueen[1] or totalPieceValue[1] < 15)
+
     def bestMove(self, allPossibleMoves, colour, NumberOfMoves, Grid, pieceLocations):
         if colour == 0:
             maxi = [[(), (), float("inf")] for i in range(NumberOfMoves)]
@@ -593,46 +621,14 @@ class Board:
 
                 NewPieceLocations, GridCopy = self.move(startSquare, endSquare, NewPieceLocations, GridCopy)
                 evaluation = self.evaluation(GridCopy)
-                self.counter += 1
-                underAttackNow = self.isUnderSevereAttack(startSquare, Grid, NewPieceLocations)
-                underAttackLater = self.isUnderSevereAttack(endSquare, GridCopy, NewPieceLocations)
-
-                pieceValue = self.PieceValue[(Grid[startSquare[0]][startSquare[1]] & 7) - 1]
-
-                # if Grid[endSquare[0]][endSquare[1]] != 0:
-                #     if colour == 0:
-                #         evaluation -= (10 - pieceValue) * 10
-                #     else:
-                #         evaluation += (10 - pieceValue) * 10
-
-                # if pieceValue == 15:
-                #     if colour == 0:
-                #         evaluation += 100
-                #     else:
-                #         evaluation -= 100
 
                 if startSquare in king:
                     flag = True
                     copy = king[:]
-                    if king[0] == startSquare: king[0] = endSquare
-                    else: king[1] = endSquare
-
-                # if self.isCheckMate(GridCopy, NewPieceLocations, 0):
-                #     evaluation = float("inf")
-                # elif self.isCheckMate(GridCopy, NewPieceLocations, 1):
-                #     evaluation = - float("inf")
-
-                # if underAttackNow and not underAttackLater:
-                #     if colour == 0:
-                #         evaluation -= pieceValue * 5
-                #     else:
-                #         evaluation += pieceValue * 5
-                #
-                # if underAttackLater and not underAttackNow:
-                #     if colour == 0:
-                #         evaluation += pieceValue * 5
-                #     else:
-                #         evaluation -= pieceValue * 5
+                    if king[0] == startSquare:
+                        king[0] = endSquare
+                    else:
+                        king[1] = endSquare
 
                 if colour == 0:
                     for i in range(NumberOfMoves):
@@ -654,13 +650,12 @@ class Board:
 
         return maxi
 
-    def decideMove(self, colour, depth, positions, alpha, beta, CurrentBoard, CurrentPieces):  # returns coordinates of piece originally then final position of the piece
+    def decideMove(self, colour, depth, positions, alpha, beta, CurrentBoard, CurrentPieces):
 
         allPossibleMoves = self.allPossibleMoves(CurrentBoard, CurrentPieces, colour)
 
         if depth == 0:
-            a = self.bestMove(allPossibleMoves, colour, 1, CurrentBoard, CurrentPieces)
-
+            a = self.bestMove(allPossibleMoves, colour, 10, CurrentBoard, CurrentPieces)
             return (a[0][0], a[0][1]), a[0][2]
 
         SelectedBestMoves = self.bestMove(allPossibleMoves, colour, positions, CurrentBoard, CurrentPieces)
@@ -672,7 +667,8 @@ class Board:
             NewPieces = [row[:] for row in CurrentPieces]
             NewPieces, NewBoard = self.move(sq1, sq2, NewPieces, NewBoard)
 
-            countermove, evaluation = self.decideMove(1 - colour, depth - 1, positions - 2, alpha, beta, NewBoard, NewPieces)
+            countermove, evaluation = self.decideMove(1 - colour, depth - 1, positions - 2, alpha, beta, NewBoard,
+                                                      NewPieces)
             SelectedBestMoves[i][2] = evaluation
 
             if colour == 0:
@@ -686,17 +682,9 @@ class Board:
 
         SelectedBestMoves.sort(key=lambda x: x[2], reverse=colour == 1)
 
-        # if depth == 4:
-        #     for item in SelectedBestMoves:
-        #         p1, p2 = item[0], item[1]
-        #         if p1 == (): break
-        #         print(b.coordinates_to_alnum(p1), b.coordinates_to_alnum(p2), item[2])
-        #
-        #     print ("*******")
-
         return (SelectedBestMoves[0][0], SelectedBestMoves[0][1]), SelectedBestMoves[0][2]
 
-    def play(self, depth, positions):  # need to prevent piece from taking another piece of same colour
+    def play(self, depth, positions):
         checkmate = False
         middleGame = True
         colour = 1
@@ -705,19 +693,12 @@ class Board:
         screen.fill("white")
         self.drawSquares(screen)
         clock = p.time.Clock()
-        running = True
         clicks = []
 
         p.display.set_caption('Chess Bot')
         p.display.set_icon(p.image.load('images\icon.png'))
 
-        if colour == 0:
-            startValue = - float("inf")
-        else:
-            startValue = float("inf")
-
         while True:
-
             if middleGame:
                 if not self.isMiddleGame(self.Grid, self.PieceLocations):
                     self.optimalLocations[0].pop()
@@ -725,8 +706,6 @@ class Board:
                     self.optimalLocations[0].append(self.KingEndGame)
                     self.optimalLocations[1].append(self.KingEndGame)
                     middleGame = False
-
-            # selectedMove, evaluation = self.decideMove(colour, depth, positions, self.Grid, self.PieceLocations)
 
             for e in p.event.get():
                 if e.type == p.QUIT:
@@ -736,7 +715,13 @@ class Board:
                     coords = pos[1] // self.squareSize, pos[0] // self.squareSize
                     clicks.append(coords)
                     if len(clicks) == 2:
-                        if clicks[0] != clicks[1]:
+                        possibleMoves = self.allPossibleMoves(self.Grid, self.PieceLocations, colour)
+
+                        if clicks[0] not in possibleMoves.keys():
+                            clicks.pop(0)
+                            break
+
+                        if clicks[1] in possibleMoves[clicks[0]]:
                             self.PieceLocations, self.Grid = self.move(clicks[0], clicks[1], self.PieceLocations, self.Grid)
 
                             for colour in range(2):
@@ -756,17 +741,20 @@ class Board:
 
                             self.drawGrid(screen)
                             p.display.flip()
+
                             colour = 1 - colour
 
-                            selectedMove, evaluation = self.decideMove(colour, depth, positions, - float("inf"), float("inf"), self.Grid,
+                            selectedMove, evaluation = self.decideMove(colour, depth, positions, - float("inf"),
+                                                                       float("inf"), self.Grid,
                                                                        self.PieceLocations)
 
                             self.PieceLocations, self.Grid = self.move(selectedMove[0], selectedMove[1],
-                                                                   self.PieceLocations, self.Grid)
+                                                                       self.PieceLocations, self.Grid)
 
-                            for colour in range(2):
-                                if self.isCheckMate(self.Grid, self.PieceLocations, colour):
+                            for col in range(2):
+                                if self.isCheckMate(self.Grid, self.PieceLocations, col):
                                     checkmate = True
+
                             colour = 1 - colour
 
                             if checkmate:
@@ -785,20 +773,8 @@ class Board:
             clock.tick(10)
             p.display.flip()
 
-        print ("Game over")
-    
-    def isMiddleGame(self, board, pieceLocations):
-        totalPieceValue = [0, 0]
-        isQueen = [False, False]
-
-        for c in range(2):
-            for piece in pieceLocations[c]:
-                totalPieceValue[c] += self.PieceValue[(board[piece[0]][piece[1]] & 7) - 1]
-                isQueen[c] |= board[piece[0]][piece[1]] & 7 == 5
-
-        return (isQueen[0] or totalPieceValue[0] < 15) and (isQueen[1] or totalPieceValue[1] < 15)
     # end of core functions
 
-b = Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR") # rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
+b = Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")  # rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
 
 b.play(4, 25)
