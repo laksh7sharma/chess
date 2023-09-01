@@ -6,6 +6,7 @@ class Board:
         self.PieceValue = [1, 3, 3, 5, 9, 15]
         self.PieceToNum = {"P": 1, "N": 2, "B": 3, "R": 4, "Q": 5, "K": 6}
         self.NumToPiece = ["-", "P", "N", "B", "R", "Q", "K"]
+        self.PieceHeuristics = [0, 0, 2, 2, 1, 2, -5]
         self.PieceLocations = [[], []]
         self.fen_str(start)  # rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
         self.Vectors = [(-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1)]
@@ -613,40 +614,59 @@ class Board:
 
         flag = False
 
+        goodMovesHeuristic = []
+
         for startSquare, moves in allPossibleMoves.items():
+            myPiece = Grid[startSquare[0]][startSquare[1]] & 7
+            myColour = Grid[startSquare[0]][startSquare[1]] & 8
             for endSquare in moves:
-
-                NewPieceLocations = [row[:] for row in pieceLocations]
-                GridCopy = [row[:] for row in Grid]
-
-                NewPieceLocations, GridCopy = self.move(startSquare, endSquare, NewPieceLocations, GridCopy)
-                evaluation = self.evaluation(GridCopy)
-
-                if startSquare in king:
-                    flag = True
-                    copy = king[:]
-                    if king[0] == startSquare:
-                        king[0] = endSquare
-                    else:
-                        king[1] = endSquare
-
-                if colour == 0:
-                    for i in range(NumberOfMoves):
-                        if evaluation < maxi[i][2]:
-                            maxi.insert(i, [startSquare, endSquare, evaluation])
-                            break
+                oppPiece = Grid[startSquare[0]][startSquare[1]] & 7
+                score = oppPiece + self.PieceHeuristics[myPiece]
+                if myPiece == 6 and startSquare[1] == 4:
+                    score += 7
+                if myColour == 0:
+                    forwardMovement = - endSquare[0] + startSquare[0]
                 else:
-                    for i in range(NumberOfMoves):
-                        if evaluation > maxi[i][2]:
-                            maxi.insert(i, [startSquare, endSquare, evaluation])
-                            break
+                    forwardMovement = endSquare[0] - startSquare[0]
+                score += forwardMovement * 0.5
+                goodMovesHeuristic.append((startSquare, endSquare, score))
 
-                if flag:
-                    king = copy[:]
-                    flag = False
+        goodMovesHeuristic.sort(key = lambda x : x[2], reverse=True)
 
-                if len(maxi) > NumberOfMoves:
-                    maxi.pop()
+        for move in goodMovesHeuristic:
+            startSquare, endSquare, scoreHeuristic = move
+
+            NewPieceLocations = [row[:] for row in pieceLocations]
+            GridCopy = [row[:] for row in Grid]
+
+            NewPieceLocations, GridCopy = self.move(startSquare, endSquare, NewPieceLocations, GridCopy)
+            evaluation = self.evaluation(GridCopy)
+
+            if startSquare in king:
+                flag = True
+                copy = king[:]
+                if king[0] == startSquare:
+                    king[0] = endSquare
+                else:
+                    king[1] = endSquare
+
+            if colour == 0:
+                for i in range(NumberOfMoves):
+                    if evaluation < maxi[i][2]:
+                        maxi.insert(i, [startSquare, endSquare, evaluation])
+                        break
+            else:
+                for i in range(NumberOfMoves):
+                    if evaluation > maxi[i][2]:
+                        maxi.insert(i, [startSquare, endSquare, evaluation])
+                        break
+
+            if flag:
+                king = copy[:]
+                flag = False
+
+            if len(maxi) > NumberOfMoves:
+                maxi.pop()
 
         return maxi
 
@@ -716,10 +736,6 @@ class Board:
                     clicks.append(coords)
                     if len(clicks) == 2:
                         possibleMoves = self.allPossibleMoves(self.Grid, self.PieceLocations, colour)
-
-                        if clicks[0] not in possibleMoves.keys():
-                            clicks.pop(0)
-                            break
 
                         if clicks[1] in possibleMoves[clicks[0]]:
                             self.PieceLocations, self.Grid = self.move(clicks[0], clicks[1], self.PieceLocations, self.Grid)
